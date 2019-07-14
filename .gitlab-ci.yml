@@ -49,7 +49,7 @@ nodejs:
 phpunit:
     stage: test
     image: php:latest
-    parallel: 10
+    parallel: 2
     services:
         - mysql:5.7
     dependencies:
