@@ -1,0 +1,65 @@
+variables:
+    MYSQL_ROOT_PASSWORD: secret
+    MYSQL_USER: homestead
+    MYSQL_PASSWORD: secret
+    MYSQL_DATABASE: homestead
+    DB_HOST: mysql
+
+stages:
+    - build
+    - test
+    - deploy
+    
+before_script:
+    - apt-get update -y
+    - apt-get install git -y
+    - apt-get install zip unzip curl -y
+    
+composer:
+    stage: build
+    image: php:latest
+    services:
+        - mysql:5.7
+    cache:
+        paths:
+            - vendor/
+    artifacts:
+        paths:
+            - .env
+            - vendor/
+
+    script: 
+        - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+        - php -r "if (hash_file('sha384', 'composer-setup.php') === '48e3236262b34d30969dca3c37281b3b4bbe3221bda826ac6a9a62d6444cdb0dcd0615698a5cbe587c3f0fe57a54d8f5') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+        - php composer-setup.php
+        - php -r "unlink('composer-setup.php');"
+        - php composer.phar install
+        - cp .env.example .env
+        - php artisan key:generate
+nodejs:
+    stage: build
+    image: node:latest
+    cache:
+        paths:
+            - node_modules/
+    script:
+        - npm install
+        - npm run production
+        
+phpunit:
+    stage: test
+    image: php:latest
+    parallel: 10
+    services:
+        - mysql:5.7
+    dependencies:
+        - composer
+    script:
+        - docker-php-ext-install pdo_mysql
+        - apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev
+        - docker-php-ext-install -j$(nproc) iconv
+        - docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/
+        - docker-php-ext-install -j$(nproc) gd
+        - ./vendor/bin/phpunit
+        
+        
